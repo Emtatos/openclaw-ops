@@ -5,11 +5,13 @@
 
 .DESCRIPTION
     Reads files from a backup folder (created by openclaw-backup.ps1),
-    compares each file to its current counterpart, displays a diff,
-    and prompts the operator for Y/N confirmation before overwriting.
+    compares each file to its current counterpart, displays a REDACTED
+    diff (secret values are never shown in terminal output), and prompts
+    the operator for Y/N confirmation before overwriting.
 
     NOTHING is written automatically.  Every file requires explicit
-    approval.
+    approval.  The actual file content (with real values) is only
+    written to disk after Y confirmation — it is never displayed.
 
 .PARAMETER BackupDir
     Path to the backup snapshot folder (the timestamped folder inside
@@ -17,11 +19,11 @@
 
 .PARAMETER OpenClawRoot
     Path to the OpenClaw installation directory where files will be
-    restored to.  Defaults to the current directory.
+    restored to.  Defaults to $env:USERPROFILE\.openclaw.
 
 .EXAMPLE
     .\openclaw-restore.ps1 -BackupDir ".\openclaw-backups\2025-05-01_143000"
-    .\openclaw-restore.ps1 -BackupDir ".\openclaw-backups\2025-05-01_143000_pre-v2" -OpenClawRoot "C:\OpenClaw"
+    .\openclaw-restore.ps1 -BackupDir ".\openclaw-backups\2025-05-01_143000_pre-v2" -OpenClawRoot "D:\my-openclaw"
 #>
 
 [CmdletBinding()]
@@ -30,11 +32,44 @@ param(
     [string]$BackupDir,
 
     [Parameter()]
-    [string]$OpenClawRoot = (Get-Location).Path
+    [string]$OpenClawRoot = (Join-Path $env:USERPROFILE '.openclaw')
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# ── Redaction rules (same as openclaw-redact.ps1) ────────────────────
+$script:redactionRules = @(
+    @{
+        Pattern     = '(?i)("(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)")\s*:\s*"[^"]*"'
+        Replacement = '$1: "[REDACTED]"'
+    },
+    @{
+        Pattern     = '(?im)^(\s*(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)\s*:\s*)(.+)$'
+        Replacement = '$1[REDACTED]'
+    },
+    @{
+        Pattern     = '(?im)^(\s*(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)\s*=\s*)(.+)$'
+        Replacement = '$1[REDACTED]'
+    },
+    @{
+        Pattern     = '(?i)(<(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)>)[^<]*(</)'
+        Replacement = '$1[REDACTED]$2'
+    },
+    @{
+        Pattern     = '(?<=[=:"\s])[A-Za-z0-9+/]{40,}={0,2}(?=["\s,\r\n]|$)'
+        Replacement = '[REDACTED-LONG-TOKEN]'
+    }
+)
+
+function Invoke-RedactLine {
+    param([string]$Line)
+    $result = $Line
+    foreach ($rule in $script:redactionRules) {
+        $result = [regex]::Replace($result, $rule.Pattern, $rule.Replacement)
+    }
+    return $result
+}
 
 # ── Validate backup directory ────────────────────────────────────────
 if (-not (Test-Path $BackupDir)) {
@@ -65,11 +100,12 @@ if ($backupFiles.Count -eq 0) {
 }
 
 Write-Host "Found $($backupFiles.Count) file(s) in backup." -ForegroundColor Cyan
-Write-Host "Each file will be shown with a diff. You must approve (Y) or skip (N) each one." -ForegroundColor Yellow
+Write-Host "Each file will be shown with a REDACTED diff. You must approve (Y) or skip (N) each one." -ForegroundColor Yellow
+Write-Host "(Secret values are never shown in the diff.)" -ForegroundColor Yellow
 Write-Host ""
 
-# ── Helper: simple line-by-line diff ─────────────────────────────────
-function Show-Diff {
+# ── Helper: redacted line-by-line diff ───────────────────────────────
+function Show-RedactedDiff {
     param(
         [string]$CurrentContent,
         [string]$BackupContent
@@ -93,16 +129,20 @@ function Show-Diff {
         $hasDiff = $true
         $lineNum = $i + 1
 
+        # Redact both sides before displaying
+        $curSafe = if ($null -ne $cur) { Invoke-RedactLine $cur } else { $null }
+        $bakSafe = if ($null -ne $bak) { Invoke-RedactLine $bak } else { $null }
+
         if ($null -eq $cur) {
             Write-Host "  Line ${lineNum}:" -ForegroundColor DarkGray
-            Write-Host "    + (backup)  : $bak" -ForegroundColor Green
+            Write-Host "    + (backup)  : $bakSafe" -ForegroundColor Green
         } elseif ($null -eq $bak) {
             Write-Host "  Line ${lineNum}:" -ForegroundColor DarkGray
-            Write-Host "    - (current) : $cur" -ForegroundColor Red
+            Write-Host "    - (current) : $curSafe" -ForegroundColor Red
         } else {
             Write-Host "  Line ${lineNum}:" -ForegroundColor DarkGray
-            Write-Host "    - (current) : $cur" -ForegroundColor Red
-            Write-Host "    + (backup)  : $bak" -ForegroundColor Green
+            Write-Host "    - (current) : $curSafe" -ForegroundColor Red
+            Write-Host "    + (backup)  : $bakSafe" -ForegroundColor Green
         }
     }
 
@@ -131,8 +171,8 @@ foreach ($bf in $backupFiles) {
             continue
         }
 
-        Write-Host "  Differences:" -ForegroundColor Yellow
-        $hasDiff = Show-Diff -CurrentContent $currentContent -BackupContent $backupContent
+        Write-Host "  Differences (redacted):" -ForegroundColor Yellow
+        $hasDiff = Show-RedactedDiff -CurrentContent $currentContent -BackupContent $backupContent
 
         if (-not $hasDiff) {
             Write-Host "  [IDENTICAL] Only whitespace differences. Skipping." -ForegroundColor DarkGray
@@ -140,9 +180,10 @@ foreach ($bf in $backupFiles) {
             continue
         }
     } else {
-        Write-Host "  [NEW] File does not exist at destination. Full content from backup:" -ForegroundColor Yellow
+        Write-Host "  [NEW] File does not exist at destination. Preview (redacted):" -ForegroundColor Yellow
         $preview = ($backupContent -split "`n" | Select-Object -First 15) -join "`n"
-        Write-Host $preview -ForegroundColor DarkGray
+        $safePreview = Invoke-RedactLine $preview
+        Write-Host $safePreview -ForegroundColor DarkGray
         if (($backupContent -split "`n").Count -gt 15) {
             Write-Host "  ... ($(($backupContent -split "`n").Count - 15) more lines)" -ForegroundColor DarkGray
         }

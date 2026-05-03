@@ -5,23 +5,23 @@
 
 .DESCRIPTION
     Scans the OpenClaw installation directory for configuration files,
-    verifies file presence/permissions, checks service status, and
-    reports connectivity.  All output is safe to share; secrets are
-    never printed.
+    verifies file presence/permissions, checks OpenClaw CLI/gateway
+    status, and reports connectivity.  All output is safe to share;
+    secrets are never printed.
 
 .PARAMETER OpenClawRoot
     Path to the OpenClaw installation directory.
-    Defaults to the current directory.
+    Defaults to $env:USERPROFILE\.openclaw.
 
 .EXAMPLE
     .\openclaw-diag.ps1
-    .\openclaw-diag.ps1 -OpenClawRoot "C:\OpenClaw"
+    .\openclaw-diag.ps1 -OpenClawRoot "D:\my-openclaw"
 #>
 
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string]$OpenClawRoot = (Get-Location).Path
+    [string]$OpenClawRoot = (Join-Path $env:USERPROFILE '.openclaw')
 )
 
 Set-StrictMode -Version Latest
@@ -30,19 +30,6 @@ $ErrorActionPreference = 'Continue'
 # ── Helpers ──────────────────────────────────────────────────────────
 function Write-Section([string]$Title) {
     Write-Host "`n═══ $Title ═══" -ForegroundColor Cyan
-}
-
-function Test-SecretPattern([string]$Value) {
-    # Returns $true if a value looks like it might be a secret
-    $patterns = @(
-        '(?i)(key|secret|token|password|pwd|apikey|api_key|passphrase)',
-        '^[A-Za-z0-9+/=]{20,}$',
-        '^[0-9a-f]{32,}$'
-    )
-    foreach ($p in $patterns) {
-        if ($Value -match $p) { return $true }
-    }
-    return $false
 }
 
 # ── 1. Environment ──────────────────────────────────────────────────
@@ -95,7 +82,7 @@ Write-Section "Secret-key audit"
 
 $secretKeyPatterns = @(
     '(?i)(api[_-]?key|api[_-]?secret|password|secret|token|passphrase|private[_-]?key|credentials?)',
-    '(?i)(connection[_-]?string|auth[_-]?token|access[_-]?key|client[_-]?secret)'
+    '(?i)(connection[_-]?string|auth[_-]?token|access[_-]?key|client[_-]?secret|bot[_-]?token)'
 )
 
 $auditResults = @()
@@ -154,13 +141,43 @@ try {
     Write-Host "python: not found"
 }
 
-# ── 6. Network connectivity ─────────────────────────────────────────
-Write-Section "Network connectivity"
+# ── 6. OpenClaw CLI / gateway checks ────────────────────────────────
+Write-Section "OpenClaw CLI / gateway"
+
+$openclawCmd = Get-Command openclaw -ErrorAction SilentlyContinue
+if ($openclawCmd) {
+    Write-Host "  openclaw CLI: $($openclawCmd.Source)" -ForegroundColor Green
+
+    foreach ($sub in @('gateway status', 'nodes status', 'exec-policy show')) {
+        try {
+            $out = & openclaw $sub.Split(' ') 2>&1
+            $first = ($out | Select-Object -First 3) -join '; '
+            Write-Host "  [OK]   openclaw $sub — $first" -ForegroundColor Green
+        } catch {
+            Write-Host "  [FAIL] openclaw $sub — $($_.Exception.Message)" -ForegroundColor Red
+        }
+    }
+} else {
+    Write-Host "  openclaw CLI: not found in PATH" -ForegroundColor DarkGray
+}
+
+# localhost gateway port check
+try {
+    $tcp = New-Object System.Net.Sockets.TcpClient
+    $tcp.Connect('127.0.0.1', 18789)
+    $tcp.Close()
+    Write-Host "  [OK]   Gateway port 18789 is listening" -ForegroundColor Green
+} catch {
+    Write-Host "  [SKIP] Gateway port 18789 is not listening" -ForegroundColor DarkGray
+}
+
+# ── 7. Optional network connectivity ────────────────────────────────
+Write-Section "Network connectivity (optional)"
 
 $endpoints = @(
-    @{ Name = "Kraken REST API";      Uri = "https://api.kraken.com/0/public/SystemStatus" },
-    @{ Name = "Kraken WebSocket";     Uri = "https://ws.kraken.com" },
-    @{ Name = "GitHub (updates)";     Uri = "https://api.github.com" }
+    @{ Name = "GitHub";  Uri = "https://api.github.com" },
+    @{ Name = "npm";     Uri = "https://registry.npmjs.org" },
+    @{ Name = "OpenAI";  Uri = "https://api.openai.com/v1/models" }
 )
 
 foreach ($ep in $endpoints) {
@@ -172,7 +189,7 @@ foreach ($ep in $endpoints) {
     }
 }
 
-# ── 7. Process / service check ──────────────────────────────────────
+# ── 8. Process / service check ──────────────────────────────────────
 Write-Section "Process / service check"
 
 $processNames = @('OpenClaw', 'openclaw', 'dotnet')
@@ -188,7 +205,7 @@ foreach ($name in $processNames) {
     }
 }
 
-# ── 8. Log tail ──────────────────────────────────────────────────────
+# ── 9. Log tail ──────────────────────────────────────────────────────
 Write-Section "Recent log entries (last 20 lines)"
 
 $logPatterns = @('*.log', 'logs/*.log', 'log/*.log', '*.log.txt')
@@ -207,8 +224,7 @@ if ($logFiles.Count -eq 0) {
     Write-Host "─────────────────────────────────────────────"
     Get-Content $newest.FullName -Tail 20 -ErrorAction SilentlyContinue |
         ForEach-Object {
-            # Redact anything that looks like a secret in log output
-            $line = $_ -replace '(?i)(key|secret|token|password|passphrase)\s*[=:]\s*\S+', '$1=***REDACTED***'
+            $line = $_ -replace '(?i)(key|secret|token|password|passphrase|botToken|apiKey)\s*[=:]\s*\S+', '$1=***REDACTED***'
             Write-Host "  $line"
         }
 }
