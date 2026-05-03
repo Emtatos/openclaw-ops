@@ -9,7 +9,7 @@
     so redaction strength is consistent everywhere.
 #>
 
-# ── Redaction rules ──────────────────────────────────────────────────
+# -- Redaction rules --------------------------------------------------
 # Each rule: a regex pattern and a replacement string.
 # Rules are applied in order; earlier rules take priority.
 

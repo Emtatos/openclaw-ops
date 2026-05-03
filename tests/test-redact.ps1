@@ -11,18 +11,18 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptRoot = Split-Path -Parent $PSScriptRoot
-$redactScript = Join-Path $scriptRoot 'scripts' 'openclaw-redact.ps1'
+$redactScript = Join-Path $scriptRoot 'scripts\openclaw-redact.ps1'
 $fixtureDir   = Join-Path $PSScriptRoot 'fixtures'
 $outputDir    = Join-Path $PSScriptRoot '_test-redacted-output'
 
 # Clean previous run
 if (Test-Path $outputDir) { Remove-Item $outputDir -Recurse -Force }
 
-# ── Run redaction ────────────────────────────────────────────────────
+# -- Run redaction ----------------------------------------------------
 Write-Host "Running openclaw-redact.ps1 on fixtures..." -ForegroundColor Cyan
 & $redactScript -OpenClawRoot $fixtureDir -OutputDir $outputDir
 
-# ── Test 1: Output file exists ───────────────────────────────────────
+# -- Test 1: Output file exists ---------------------------------------
 $redactedFile = Join-Path $outputDir 'openclaw-fake.json'
 if (-not (Test-Path $redactedFile)) {
     Write-Host "[FAIL] Redacted file not found at $redactedFile" -ForegroundColor Red
@@ -30,7 +30,7 @@ if (-not (Test-Path $redactedFile)) {
 }
 Write-Host "[PASS] Redacted file exists" -ForegroundColor Green
 
-# ── Test 2: Output is valid JSON ─────────────────────────────────────
+# -- Test 2: Output is valid JSON -------------------------------------
 $content = Get-Content $redactedFile -Raw
 try {
     $parsed = $content | ConvertFrom-Json
@@ -42,42 +42,42 @@ try {
     exit 1
 }
 
-# ── Test 3: botToken is redacted ─────────────────────────────────────
+# -- Test 3: botToken is redacted -------------------------------------
 if ($content -match 'FAKE_TOKEN_') {
     Write-Host "[FAIL] botToken value 'FAKE_TOKEN_*' was NOT redacted" -ForegroundColor Red
     exit 1
 }
 Write-Host "[PASS] botToken is redacted" -ForegroundColor Green
 
-# ── Test 4: apiKey is redacted ───────────────────────────────────────
+# -- Test 4: apiKey is redacted ---------------------------------------
 if ($content -match 'FAKE_API_KEY_') {
     Write-Host "[FAIL] apiKey value 'FAKE_API_KEY_*' was NOT redacted" -ForegroundColor Red
     exit 1
 }
 Write-Host "[PASS] apiKey is redacted" -ForegroundColor Green
 
-# ── Test 5: key is redacted ─────────────────────────────────────────
+# -- Test 5: key is redacted -----------------------------------------
 if ($content -match 'sk-FAKE_SECRET_KEY') {
     Write-Host "[FAIL] key value 'sk-*' was NOT redacted" -ForegroundColor Red
     exit 1
 }
 Write-Host "[PASS] key is redacted" -ForegroundColor Green
 
-# ── Test 6: secret is redacted ───────────────────────────────────────
+# -- Test 6: secret is redacted ---------------------------------------
 if ($content -match 'superSecretValue') {
     Write-Host "[FAIL] secret value was NOT redacted" -ForegroundColor Red
     exit 1
 }
 Write-Host "[PASS] secret is redacted" -ForegroundColor Green
 
-# ── Test 7: password is redacted ─────────────────────────────────────
+# -- Test 7: password is redacted -------------------------------------
 if ($content -match 'FAKE_PASSWORD_') {
     Write-Host "[FAIL] password value was NOT redacted" -ForegroundColor Red
     exit 1
 }
 Write-Host "[PASS] password is redacted" -ForegroundColor Green
 
-# ── Test 8: Safe fields are intact ───────────────────────────────────
+# -- Test 8: Safe fields are intact -----------------------------------
 if ($parsed.safeField -ne 'this-value-should-not-be-redacted') {
     Write-Host "[FAIL] safeField was incorrectly modified: $($parsed.safeField)" -ForegroundColor Red
     exit 1
@@ -102,7 +102,14 @@ if ($parsed.description -ne 'Test instance for CI verification') {
 }
 Write-Host "[PASS] description is intact" -ForegroundColor Green
 
-# ── Test 9: _redaction-manifest.json exists ──────────────────────────
+# -- Test 9: No escaped quotes in redacted JSON (regression guard) ----
+if ($content -match '\\"') {
+    Write-Host "[FAIL] Redacted JSON contains escaped quotes" -ForegroundColor Red
+    exit 1
+}
+Write-Host "[PASS] Redacted JSON has no escaped quotes" -ForegroundColor Green
+
+# -- Test 10: _redaction-manifest.json exists -------------------------
 $manifestFile = Join-Path $outputDir '_redaction-manifest.json'
 if (-not (Test-Path $manifestFile)) {
     Write-Host "[FAIL] _redaction-manifest.json not found" -ForegroundColor Red
@@ -117,8 +124,8 @@ try {
     exit 1
 }
 
-# ── Cleanup ──────────────────────────────────────────────────────────
+# -- Cleanup ----------------------------------------------------------
 Remove-Item $outputDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host ""
-Write-Host "═══ All redaction tests passed ═══" -ForegroundColor Green
+Write-Host "=== All redaction tests passed ===" -ForegroundColor Green

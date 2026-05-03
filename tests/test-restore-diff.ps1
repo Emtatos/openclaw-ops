@@ -16,18 +16,18 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptRoot   = Split-Path -Parent $PSScriptRoot
-$restoreScript = Join-Path $scriptRoot 'scripts' 'openclaw-restore.ps1'
+$restoreScript = Join-Path $scriptRoot 'scripts\openclaw-restore.ps1'
 
 $testDir   = Join-Path $PSScriptRoot '_test-restore-work'
 $currentDir = Join-Path $testDir 'current'
 $backupDir  = Join-Path $testDir 'backup'
 
-# ── Setup ────────────────────────────────────────────────────────────
+# -- Setup ------------------------------------------------------------
 if (Test-Path $testDir) { Remove-Item $testDir -Recurse -Force }
 New-Item -ItemType Directory -Path $currentDir -Force | Out-Null
 New-Item -ItemType Directory -Path $backupDir  -Force | Out-Null
 
-# Current config — has "new" secret values
+# Current config -- has "new" secret values
 $currentJson = @'
 {
   "name": "my-openclaw-instance",
@@ -40,7 +40,7 @@ $currentJson = @'
 }
 '@
 
-# Backup config — has "old" secret values
+# Backup config -- has "old" secret values
 $backupJson = @'
 {
   "name": "my-openclaw-instance",
@@ -58,7 +58,7 @@ Set-Content -Path (Join-Path $backupDir  'openclaw-fake.json') -Value $backupJso
 
 Write-Host "Running restore script to capture diff output..." -ForegroundColor Cyan
 
-# ── Capture diff output ──────────────────────────────────────────────
+# -- Capture diff output ----------------------------------------------
 # We pipe "N" to every prompt so no files are actually restored.
 # We capture all Write-Host output by redirecting the information stream.
 $output = & {
@@ -69,7 +69,7 @@ $output = & {
 
 Write-Host "Captured output ($($output.Length) chars)" -ForegroundColor DarkGray
 
-# ── Secret strings that must NOT appear in output ────────────────────
+# -- Secret strings that must NOT appear in output --------------------
 $forbiddenStrings = @(
     'FAKE_TOKEN_CURRENT_',
     'FAKE_TOKEN_BACKUP_',
@@ -94,19 +94,19 @@ foreach ($forbidden in $forbiddenStrings) {
     }
 }
 
-# ── Verify safe values CAN appear ────────────────────────────────────
+# -- Verify safe values CAN appear ------------------------------------
 # "unchanged-value" should not appear either (identical lines are skipped)
 # but "my-openclaw-instance" should also not leak since it's identical on both sides
-Write-Host "[INFO] Safe field 'unchanged-value' is identical on both sides — correctly skipped in diff" -ForegroundColor DarkGray
+Write-Host "[INFO] Safe field 'unchanged-value' is identical on both sides -- correctly skipped in diff" -ForegroundColor DarkGray
 
-# ── Cleanup ──────────────────────────────────────────────────────────
+# -- Cleanup ----------------------------------------------------------
 Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
 
 if ($failed) {
     Write-Host ""
-    Write-Host "═══ RESTORE DIFF TESTS FAILED ═══" -ForegroundColor Red
+    Write-Host "=== RESTORE DIFF TESTS FAILED ===" -ForegroundColor Red
     exit 1
 } else {
     Write-Host ""
-    Write-Host "═══ All restore-diff tests passed ═══" -ForegroundColor Green
+    Write-Host "=== All restore-diff tests passed ===" -ForegroundColor Green
 }

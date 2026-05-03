@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    OpenClaw diagnostics — collects environment and config health info
+    OpenClaw diagnostics -- collects environment and config health info
     without ever displaying secret values.
 
 .DESCRIPTION
@@ -31,15 +31,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Continue'
 
-# ── Load shared redaction rules ──────────────────────────────────────
+# -- Load shared redaction rules --------------------------------------
 . (Join-Path $PSScriptRoot 'openclaw-redaction-lib.ps1')
 
-# ── Helpers ──────────────────────────────────────────────────────────
+# -- Helpers ----------------------------------------------------------
 function Write-Section([string]$Title) {
-    Write-Host "`n═══ $Title ═══" -ForegroundColor Cyan
+    Write-Host "`n=== $Title ===" -ForegroundColor Cyan
 }
 
-# ── 1. Environment ──────────────────────────────────────────────────
+# -- 1. Environment --------------------------------------------------
 Write-Section "Environment"
 Write-Host "Hostname        : $env:COMPUTERNAME"
 Write-Host "OS              : $([System.Environment]::OSVersion.VersionString)"
@@ -48,7 +48,7 @@ Write-Host "User            : $env:USERNAME"
 Write-Host "Date (UTC)      : $((Get-Date).ToUniversalTime().ToString('o'))"
 Write-Host "OpenClawRoot    : $OpenClawRoot"
 
-# ── 2. Directory structure ──────────────────────────────────────────
+# -- 2. Directory structure ------------------------------------------
 Write-Section "Directory structure"
 
 if (-not (Test-Path $OpenClawRoot)) {
@@ -62,7 +62,7 @@ if (-not (Test-Path $OpenClawRoot)) {
         }
 }
 
-# ── 3. Configuration files ─────────────────────────────────────────
+# -- 3. Configuration files -----------------------------------------
 Write-Section "Configuration files"
 
 $configExtensions = @('*.json', '*.yaml', '*.yml', '*.toml', '*.env', '*.config', '*.ini', '*.cfg', '*.xml')
@@ -84,7 +84,7 @@ if ($configFiles.Count -eq 0) {
     }
 }
 
-# ── 4. Secret-key audit (presence only, never values) ───────────────
+# -- 4. Secret-key audit (presence only, never values) ---------------
 Write-Section "Secret-key audit"
 
 $secretKeyPatterns = @(
@@ -120,10 +120,10 @@ if ($auditResults.Count -eq 0) {
 } else {
     Write-Host "Found $($auditResults.Count) potential secret key(s):"
     $auditResults | Format-Table -AutoSize
-    Write-Host "(Values are NOT shown — use openclaw-redact.ps1 before sharing config.)" -ForegroundColor Yellow
+    Write-Host "(Values are NOT shown -- use openclaw-redact.ps1 before sharing config.)" -ForegroundColor Yellow
 }
 
-# ── 5. .NET / runtime check ─────────────────────────────────────────
+# -- 5. .NET / runtime check -----------------------------------------
 Write-Section ".NET / Runtime"
 
 try {
@@ -148,7 +148,7 @@ try {
     Write-Host "python: not found"
 }
 
-# ── 6. OpenClaw CLI / gateway checks ────────────────────────────────
+# -- 6. OpenClaw CLI / gateway checks --------------------------------
 Write-Section "OpenClaw CLI / gateway"
 
 $openclawCmd = Get-Command openclaw -ErrorAction SilentlyContinue
@@ -159,9 +159,9 @@ if ($openclawCmd) {
         try {
             $out = & openclaw $sub.Split(' ') 2>&1
             $first = ($out | Select-Object -First 3) -join '; '
-            Write-Host "  [OK]   openclaw $sub — $first" -ForegroundColor Green
+            Write-Host "  [OK]   openclaw $sub -- $first" -ForegroundColor Green
         } catch {
-            Write-Host "  [FAIL] openclaw $sub — $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "  [FAIL] openclaw $sub -- $($_.Exception.Message)" -ForegroundColor Red
         }
     }
 } else {
@@ -178,7 +178,7 @@ try {
     Write-Host "  [SKIP] Gateway port 18789 is not listening" -ForegroundColor DarkGray
 }
 
-# ── 7. Optional network connectivity ────────────────────────────────
+# -- 7. Optional network connectivity --------------------------------
 Write-Section "Network connectivity (optional)"
 
 $endpoints = @(
@@ -190,13 +190,13 @@ $endpoints = @(
 foreach ($ep in $endpoints) {
     try {
         $resp = Invoke-WebRequest -Uri $ep.Uri -Method Head -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
-        Write-Host "  [OK]   $($ep.Name) ($($ep.Uri)) — HTTP $($resp.StatusCode)" -ForegroundColor Green
+        Write-Host "  [OK]   $($ep.Name) ($($ep.Uri)) -- HTTP $($resp.StatusCode)" -ForegroundColor Green
     } catch {
-        Write-Host "  [FAIL] $($ep.Name) ($($ep.Uri)) — $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "  [FAIL] $($ep.Name) ($($ep.Uri)) -- $($_.Exception.Message)" -ForegroundColor Red
     }
 }
 
-# ── 8. Process / service check ──────────────────────────────────────
+# -- 8. Process / service check --------------------------------------
 Write-Section "Process / service check"
 
 $processNames = @('OpenClaw', 'openclaw', 'dotnet')
@@ -212,7 +212,7 @@ foreach ($name in $processNames) {
     }
 }
 
-# ── 9. Log tail (full-strength redaction via shared lib) ─────────────
+# -- 9. Log tail (full-strength redaction via shared lib) -------------
 Write-Section "Recent log entries (last 20 lines, redacted)"
 
 $logPatterns = @('*.log', 'logs/*.log', 'log/*.log', '*.log.txt')
@@ -228,7 +228,7 @@ if ($logFiles.Count -eq 0) {
     $newest = $logFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     $rel = $newest.FullName.Substring($OpenClawRoot.Length).TrimStart('\', '/')
     Write-Host "Log file: $rel (modified $($newest.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')))"
-    Write-Host "─────────────────────────────────────────────"
+    Write-Host "---------------------------------------------"
     Get-Content $newest.FullName -Tail 20 -ErrorAction SilentlyContinue |
         ForEach-Object {
             $line = Invoke-RedactText $_
@@ -236,7 +236,7 @@ if ($logFiles.Count -eq 0) {
         }
 }
 
-# ── Summary ──────────────────────────────────────────────────────────
+# -- Summary ----------------------------------------------------------
 Write-Section "Summary"
 Write-Host "Diagnostics complete. No secrets were displayed."
 Write-Host "Config files found : $($configFiles.Count)"

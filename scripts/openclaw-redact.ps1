@@ -45,10 +45,10 @@ if (-not $OutputDir) {
     $OutputDir = Join-Path $OpenClawRoot 'openclaw-redacted'
 }
 
-# ── Load shared redaction rules ──────────────────────────────────────
+# -- Load shared redaction rules --------------------------------------
 . (Join-Path $PSScriptRoot 'openclaw-redaction-lib.ps1')
 
-# ── Discover config files ────────────────────────────────────────────
+# -- Discover config files --------------------------------------------
 $configExtensions = @('*.json', '*.yaml', '*.yml', '*.toml', '*.env', '*.config', '*.ini', '*.cfg', '*.xml')
 $configFiles = @()
 
@@ -69,14 +69,14 @@ if ($configFiles.Count -eq 0) {
 
 Write-Host "Found $($configFiles.Count) configuration file(s) to redact." -ForegroundColor Cyan
 
-# ── Prepare output directory ─────────────────────────────────────────
+# -- Prepare output directory -----------------------------------------
 if (Test-Path $OutputDir) {
     Write-Host "Output directory '$OutputDir' already exists. Files will be overwritten." -ForegroundColor Yellow
 } else {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
 
-# ── Redact each file ────────────────────────────────────────────────
+# -- Redact each file ------------------------------------------------
 $manifestEntries = @()
 
 foreach ($f in $configFiles) {
@@ -103,7 +103,7 @@ foreach ($f in $configFiles) {
         $redacted = [regex]::Replace($redacted, $rule.Pattern, $rule.Replacement)
     }
 
-    # Write redacted file WITHOUT any header — preserves original format
+    # Write redacted file WITHOUT any header -- preserves original format
     Set-Content -Path $destPath -Value $redacted -Encoding UTF8 -NoNewline
 
     $manifestEntries += [PSCustomObject]@{
@@ -116,7 +116,7 @@ foreach ($f in $configFiles) {
     Write-Host "  $icon $relativePath ($fileRedactions redaction(s))" -ForegroundColor $color
 }
 
-# ── Write redaction manifest (separate file) ─────────────────────────
+# -- Write redaction manifest (separate file) -------------------------
 $manifest = @{
     Timestamp    = (Get-Date).ToUniversalTime().ToString('o')
     OpenClawRoot = $OpenClawRoot
@@ -130,9 +130,9 @@ $manifest = @{
 $manifestPath = Join-Path $OutputDir '_redaction-manifest.json'
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding UTF8
 
-# ── Summary ──────────────────────────────────────────────────────────
+# -- Summary ----------------------------------------------------------
 Write-Host ""
-Write-Host "═══ Redaction complete ═══" -ForegroundColor Cyan
+Write-Host "=== Redaction complete ===" -ForegroundColor Cyan
 Write-Host "Files processed : $($manifestEntries.Count)"
 Write-Host "Total redactions: $(($manifestEntries | Measure-Object -Property Redactions -Sum).Sum)"
 Write-Host "Output directory: $OutputDir"

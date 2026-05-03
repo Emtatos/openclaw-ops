@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Restores OpenClaw configuration files from a backup — with
+    Restores OpenClaw configuration files from a backup -- with
     per-file diff review and explicit Y/N confirmation.
 
 .DESCRIPTION
@@ -11,7 +11,7 @@
 
     NOTHING is written automatically.  Every file requires explicit
     approval.  The actual file content (with real values) is only
-    written to disk after Y confirmation — it is never displayed.
+    written to disk after Y confirmation -- it is never displayed.
 
 .PARAMETER BackupDir
     Path to the backup snapshot folder (the timestamped folder inside
@@ -38,10 +38,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# ── Load shared redaction rules ──────────────────────────────────────
+# -- Load shared redaction rules --------------------------------------
 . (Join-Path $PSScriptRoot 'openclaw-redaction-lib.ps1')
 
-# ── Validate backup directory ────────────────────────────────────────
+# -- Validate backup directory ----------------------------------------
 if (-not (Test-Path $BackupDir)) {
     Write-Error "Backup directory '$BackupDir' does not exist."
     exit 1
@@ -52,7 +52,7 @@ $hasManifest  = Test-Path $manifestPath
 
 if ($hasManifest) {
     $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-    Write-Host "═══ Backup manifest ═══" -ForegroundColor Cyan
+    Write-Host "=== Backup manifest ===" -ForegroundColor Cyan
     Write-Host "  Created : $($manifest.Timestamp)"
     Write-Host "  Source  : $($manifest.OpenClawRoot)"
     Write-Host "  Tag     : $(if ($manifest.Tag) { $manifest.Tag } else { '(none)' })"
@@ -60,7 +60,7 @@ if ($hasManifest) {
     Write-Host ""
 }
 
-# ── Discover files to restore ────────────────────────────────────────
+# -- Discover files to restore ----------------------------------------
 $backupFiles = Get-ChildItem -Path $BackupDir -File -Recurse -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -ne '_backup-manifest.json' }
 
@@ -74,7 +74,7 @@ Write-Host "Each file will be shown with a REDACTED diff. You must approve (Y) o
 Write-Host "(Secret values are never shown in the diff.)" -ForegroundColor Yellow
 Write-Host ""
 
-# ── Helper: redacted line-by-line diff ───────────────────────────────
+# -- Helper: redacted line-by-line diff -------------------------------
 function Show-RedactedDiff {
     param(
         [string]$CurrentContent,
@@ -119,7 +119,7 @@ function Show-RedactedDiff {
     return $hasDiff
 }
 
-# ── Process each file ────────────────────────────────────────────────
+# -- Process each file ------------------------------------------------
 $restored = 0
 $skipped  = 0
 
@@ -127,7 +127,7 @@ foreach ($bf in $backupFiles) {
     $relativePath = $bf.FullName.Substring($BackupDir.Length).TrimStart('\', '/')
     $currentPath  = Join-Path $OpenClawRoot $relativePath
 
-    Write-Host "───────────────────────────────────────────────────────" -ForegroundColor DarkGray
+    Write-Host "-------------------------------------------------------" -ForegroundColor DarkGray
     Write-Host "File: $relativePath" -ForegroundColor White
 
     $backupContent = Get-Content $bf.FullName -Raw -ErrorAction SilentlyContinue
@@ -159,7 +159,7 @@ foreach ($bf in $backupFiles) {
         }
     }
 
-    # ── Prompt for confirmation ──────────────────────────────────────
+    # -- Prompt for confirmation --------------------------------------
     Write-Host ""
     do {
         $answer = Read-Host "  Restore '$relativePath'? (Y/N)"
@@ -181,9 +181,9 @@ foreach ($bf in $backupFiles) {
     }
 }
 
-# ── Summary ──────────────────────────────────────────────────────────
+# -- Summary ----------------------------------------------------------
 Write-Host ""
-Write-Host "═══ Restore complete ═══" -ForegroundColor Cyan
+Write-Host "=== Restore complete ===" -ForegroundColor Cyan
 Write-Host "Files restored : $restored"
 Write-Host "Files skipped  : $skipped"
 Write-Host "Total in backup: $($backupFiles.Count)"

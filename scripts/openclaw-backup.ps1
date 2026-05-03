@@ -54,7 +54,7 @@ if (-not $BackupRoot) {
     $BackupRoot = Join-Path $OpenClawRoot 'openclaw-backups'
 }
 
-# ── Known config file allowlist ──────────────────────────────────────
+# -- Known config file allowlist --------------------------------------
 $coreFiles = @(
     'openclaw.json',
     'exec-approvals.json',
@@ -66,12 +66,12 @@ $coreFiles = @(
 
 $sessionGlob = 'sessions'
 
-# ── Build backup folder name ─────────────────────────────────────────
+# -- Build backup folder name -----------------------------------------
 $timestamp = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $folderName = if ($Tag) { "${timestamp}_${Tag}" } else { $timestamp }
 $backupDir  = Join-Path $BackupRoot $folderName
 
-# ── Collect files to back up ─────────────────────────────────────────
+# -- Collect files to back up -----------------------------------------
 $filesToBackup = @()
 
 foreach ($rel in $coreFiles) {
@@ -105,10 +105,10 @@ if ($filesToBackup.Count -eq 0) {
 
 Write-Host "Found $($filesToBackup.Count) file(s) to back up." -ForegroundColor Cyan
 
-# ── Create backup directory ──────────────────────────────────────────
+# -- Create backup directory ------------------------------------------
 New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
 
-# ── Copy files ───────────────────────────────────────────────────────
+# -- Copy files -------------------------------------------------------
 $copied = 0
 
 foreach ($f in $filesToBackup) {
@@ -124,7 +124,7 @@ foreach ($f in $filesToBackup) {
     $copied++
 }
 
-# ── Write manifest ───────────────────────────────────────────────────
+# -- Write manifest ---------------------------------------------------
 $manifest = @{
     Timestamp       = (Get-Date).ToUniversalTime().ToString('o')
     OpenClawRoot    = $OpenClawRoot
@@ -137,9 +137,9 @@ $manifest = @{
 $manifestPath = Join-Path $backupDir '_backup-manifest.json'
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding UTF8
 
-# ── Summary ──────────────────────────────────────────────────────────
+# -- Summary ----------------------------------------------------------
 Write-Host ""
-Write-Host "═══ Backup complete ═══" -ForegroundColor Cyan
+Write-Host "=== Backup complete ===" -ForegroundColor Cyan
 Write-Host "Files backed up : $copied"
 Write-Host "Backup location : $backupDir"
 Write-Host "Manifest        : $manifestPath"
