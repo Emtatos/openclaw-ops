@@ -9,6 +9,10 @@
     status, and reports connectivity.  All output is safe to share;
     secrets are never printed.
 
+    Log tail output uses the same full-strength redaction rules as
+    openclaw-redact.ps1 and openclaw-restore.ps1 (via the shared
+    openclaw-redaction-lib.ps1).
+
 .PARAMETER OpenClawRoot
     Path to the OpenClaw installation directory.
     Defaults to $env:USERPROFILE\.openclaw.
@@ -26,6 +30,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Continue'
+
+# ── Load shared redaction rules ──────────────────────────────────────
+. (Join-Path $PSScriptRoot 'openclaw-redaction-lib.ps1')
 
 # ── Helpers ──────────────────────────────────────────────────────────
 function Write-Section([string]$Title) {
@@ -205,8 +212,8 @@ foreach ($name in $processNames) {
     }
 }
 
-# ── 9. Log tail ──────────────────────────────────────────────────────
-Write-Section "Recent log entries (last 20 lines)"
+# ── 9. Log tail (full-strength redaction via shared lib) ─────────────
+Write-Section "Recent log entries (last 20 lines, redacted)"
 
 $logPatterns = @('*.log', 'logs/*.log', 'log/*.log', '*.log.txt')
 $logFiles = @()
@@ -224,7 +231,7 @@ if ($logFiles.Count -eq 0) {
     Write-Host "─────────────────────────────────────────────"
     Get-Content $newest.FullName -Tail 20 -ErrorAction SilentlyContinue |
         ForEach-Object {
-            $line = $_ -replace '(?i)(key|secret|token|password|passphrase|botToken|apiKey)\s*[=:]\s*\S+', '$1=***REDACTED***'
+            $line = Invoke-RedactText $_
             Write-Host "  $line"
         }
 }

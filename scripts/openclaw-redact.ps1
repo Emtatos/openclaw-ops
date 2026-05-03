@@ -45,47 +45,8 @@ if (-not $OutputDir) {
     $OutputDir = Join-Path $OpenClawRoot 'openclaw-redacted'
 }
 
-# ── Redaction rules ──────────────────────────────────────────────────
-# Each rule: a regex that captures the key part and replaces the value.
-# The replacements preserve structure so the redacted file stays valid.
-
-$script:redactionRules = @(
-    # JSON:  "key": "value"  or  "key": "value",
-    @{
-        Pattern     = '(?i)("(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)")\s*:\s*"[^"]*"'
-        Replacement = '$1: "[REDACTED]"'
-    },
-    # YAML:  key: value
-    @{
-        Pattern     = '(?im)^(\s*(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)\s*:\s*)(.+)$'
-        Replacement = '$1[REDACTED]'
-    },
-    # .env / INI:  KEY=value
-    @{
-        Pattern     = '(?im)^(\s*(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)\s*=\s*)(.+)$'
-        Replacement = '$1[REDACTED]'
-    },
-    # XML:  <Key>value</Key>
-    @{
-        Pattern     = '(?i)(<(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)>)[^<]*(</)'
-        Replacement = '$1[REDACTED]$2'
-    },
-    # Catch-all: long base64 / hex strings (>=40 chars) that are likely keys
-    @{
-        Pattern     = '(?<=[=:"\s])[A-Za-z0-9+/]{40,}={0,2}(?=["\s,\r\n]|$)'
-        Replacement = '[REDACTED-LONG-TOKEN]'
-    }
-)
-
-# ── Shared redaction function (also used by restore) ─────────────────
-function Invoke-Redact {
-    param([string]$Text)
-    $result = $Text
-    foreach ($rule in $script:redactionRules) {
-        $result = [regex]::Replace($result, $rule.Pattern, $rule.Replacement)
-    }
-    return $result
-}
+# ── Load shared redaction rules ──────────────────────────────────────
+. (Join-Path $PSScriptRoot 'openclaw-redaction-lib.ps1')
 
 # ── Discover config files ────────────────────────────────────────────
 $configExtensions = @('*.json', '*.yaml', '*.yml', '*.toml', '*.env', '*.config', '*.ini', '*.cfg', '*.xml')

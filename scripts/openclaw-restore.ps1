@@ -38,38 +38,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# ── Redaction rules (same as openclaw-redact.ps1) ────────────────────
-$script:redactionRules = @(
-    @{
-        Pattern     = '(?i)("(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)")\s*:\s*"[^"]*"'
-        Replacement = '$1: "[REDACTED]"'
-    },
-    @{
-        Pattern     = '(?im)^(\s*(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)\s*:\s*)(.+)$'
-        Replacement = '$1[REDACTED]'
-    },
-    @{
-        Pattern     = '(?im)^(\s*(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)\s*=\s*)(.+)$'
-        Replacement = '$1[REDACTED]'
-    },
-    @{
-        Pattern     = '(?i)(<(?:api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)>)[^<]*(</)'
-        Replacement = '$1[REDACTED]$2'
-    },
-    @{
-        Pattern     = '(?<=[=:"\s])[A-Za-z0-9+/]{40,}={0,2}(?=["\s,\r\n]|$)'
-        Replacement = '[REDACTED-LONG-TOKEN]'
-    }
-)
-
-function Invoke-RedactLine {
-    param([string]$Line)
-    $result = $Line
-    foreach ($rule in $script:redactionRules) {
-        $result = [regex]::Replace($result, $rule.Pattern, $rule.Replacement)
-    }
-    return $result
-}
+# ── Load shared redaction rules ──────────────────────────────────────
+. (Join-Path $PSScriptRoot 'openclaw-redaction-lib.ps1')
 
 # ── Validate backup directory ────────────────────────────────────────
 if (-not (Test-Path $BackupDir)) {
@@ -130,8 +100,8 @@ function Show-RedactedDiff {
         $lineNum = $i + 1
 
         # Redact both sides before displaying
-        $curSafe = if ($null -ne $cur) { Invoke-RedactLine $cur } else { $null }
-        $bakSafe = if ($null -ne $bak) { Invoke-RedactLine $bak } else { $null }
+        $curSafe = if ($null -ne $cur) { Invoke-RedactText $cur } else { $null }
+        $bakSafe = if ($null -ne $bak) { Invoke-RedactText $bak } else { $null }
 
         if ($null -eq $cur) {
             Write-Host "  Line ${lineNum}:" -ForegroundColor DarkGray
@@ -182,7 +152,7 @@ foreach ($bf in $backupFiles) {
     } else {
         Write-Host "  [NEW] File does not exist at destination. Preview (redacted):" -ForegroundColor Yellow
         $preview = ($backupContent -split "`n" | Select-Object -First 15) -join "`n"
-        $safePreview = Invoke-RedactLine $preview
+        $safePreview = Invoke-RedactText $preview
         Write-Host $safePreview -ForegroundColor DarkGray
         if (($backupContent -split "`n").Count -gt 15) {
             Write-Host "  ... ($(($backupContent -split "`n").Count - 15) more lines)" -ForegroundColor DarkGray

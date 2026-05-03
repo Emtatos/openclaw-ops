@@ -19,7 +19,7 @@ Collects environment and configuration health information — **without ever dis
 - Tests gateway port 18789 connectivity
 - Optional network checks (GitHub, npm, OpenAI)
 - Checks if OpenClaw processes are running
-- Tails the most recent log file (with inline redaction)
+- Tails the most recent log file with **full-strength redaction** (same rules as redact/restore — JSON-shaped secrets, `sk-*` tokens, YAML/INI/XML values are all caught)
 
 ```powershell
 .\scripts\openclaw-diag.ps1
@@ -142,6 +142,9 @@ Test fixtures and scripts live in `tests/`:
 
 # Test that restore diff output never shows secret values
 .\tests\test-restore-diff.ps1
+
+# Test that diag log tail output never shows secret values
+.\tests\test-diag-log.ps1
 ```
 
 ---
