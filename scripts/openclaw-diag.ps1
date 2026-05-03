@@ -69,11 +69,11 @@ $configExtensions = @('*.json', '*.yaml', '*.yml', '*.toml', '*.env', '*.config'
 $configFiles = @()
 
 foreach ($ext in $configExtensions) {
-    $found = Get-ChildItem -Path $OpenClawRoot -Filter $ext -Recurse -ErrorAction SilentlyContinue
+    $found = @(Get-ChildItem -Path $OpenClawRoot -Filter $ext -Recurse -ErrorAction SilentlyContinue)
     $configFiles += $found
 }
 
-if ($configFiles.Count -eq 0) {
+if (@($configFiles).Count -eq 0) {
     Write-Host "No configuration files found."
 } else {
     foreach ($f in $configFiles) {
@@ -115,10 +115,10 @@ foreach ($f in $configFiles) {
     }
 }
 
-if ($auditResults.Count -eq 0) {
+if (@($auditResults).Count -eq 0) {
     Write-Host "No secret-looking keys detected."
 } else {
-    Write-Host "Found $($auditResults.Count) potential secret key(s):"
+    Write-Host "Found $(@($auditResults).Count) potential secret key(s):"
     $auditResults | Format-Table -AutoSize
     Write-Host "(Values are NOT shown -- use openclaw-redact.ps1 before sharing config.)" -ForegroundColor Yellow
 }
@@ -219,10 +219,10 @@ $logPatterns = @('*.log', 'logs/*.log', 'log/*.log', '*.log.txt')
 $logFiles = @()
 
 foreach ($lp in $logPatterns) {
-    $logFiles += Get-ChildItem -Path $OpenClawRoot -Filter $lp -Recurse -ErrorAction SilentlyContinue
+    $logFiles += @(Get-ChildItem -Path $OpenClawRoot -Filter $lp -Recurse -ErrorAction SilentlyContinue)
 }
 
-if ($logFiles.Count -eq 0) {
+if (@($logFiles).Count -eq 0) {
     Write-Host "No log files found."
 } else {
     $newest = $logFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -239,8 +239,8 @@ if ($logFiles.Count -eq 0) {
 # -- Summary ----------------------------------------------------------
 Write-Section "Summary"
 Write-Host "Diagnostics complete. No secrets were displayed."
-Write-Host "Config files found : $($configFiles.Count)"
-Write-Host "Secret keys found  : $($auditResults.Count)"
-Write-Host "Log files found    : $($logFiles.Count)"
+Write-Host "Config files found : $(@($configFiles).Count)"
+Write-Host "Secret keys found  : $(@($auditResults).Count)"
+Write-Host "Log files found    : $(@($logFiles).Count)"
 Write-Host ""
 Write-Host "Next step: run .\openclaw-redact.ps1 to create a safe, shareable copy." -ForegroundColor Yellow

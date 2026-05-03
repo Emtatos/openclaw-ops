@@ -98,12 +98,12 @@ if ($IncludeSessions) {
     }
 }
 
-if ($filesToBackup.Count -eq 0) {
+if (@($filesToBackup).Count -eq 0) {
     Write-Host "No known OpenClaw configuration files found in '$OpenClawRoot'. Nothing to back up." -ForegroundColor Yellow
     exit 0
 }
 
-Write-Host "Found $($filesToBackup.Count) file(s) to back up." -ForegroundColor Cyan
+Write-Host "Found $(@($filesToBackup).Count) file(s) to back up." -ForegroundColor Cyan
 
 # -- Create backup directory ------------------------------------------
 New-Item -ItemType Directory -Path $backupDir -Force | Out-Null

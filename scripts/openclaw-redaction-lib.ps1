@@ -43,6 +43,11 @@ $script:redactionRules = @(
     @{
         Pattern     = '\bsk-[A-Za-z0-9_]{10,}\b'
         Replacement = '[REDACTED-SK-TOKEN]'
+    },
+    # Inline key=value in free text / log lines (password=secret, token=abc, etc.)
+    @{
+        Pattern     = '(?i)\b(api[_-]?key|api[_-]?secret|secret|password|pwd|token|passphrase|private[_-]?key|access[_-]?key|client[_-]?secret|auth[_-]?token|connection[_-]?string|credentials?|hmac|signing[_-]?key|webhook[_-]?secret|admin[_-]?password|db[_-]?password|bot[_-]?token|key)=(\S+)'
+        Replacement = '$1=[REDACTED]'
     }
 )
 

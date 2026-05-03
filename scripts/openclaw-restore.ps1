@@ -32,7 +32,10 @@ param(
     [string]$BackupDir,
 
     [Parameter()]
-    [string]$OpenClawRoot = (Join-Path $env:USERPROFILE '.openclaw')
+    [string]$OpenClawRoot = (Join-Path $env:USERPROFILE '.openclaw'),
+
+    [Parameter()]
+    [switch]$AssumeNo
 )
 
 Set-StrictMode -Version Latest
@@ -61,15 +64,15 @@ if ($hasManifest) {
 }
 
 # -- Discover files to restore ----------------------------------------
-$backupFiles = Get-ChildItem -Path $BackupDir -File -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -ne '_backup-manifest.json' }
+$backupFiles = @(Get-ChildItem -Path $BackupDir -File -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ne '_backup-manifest.json' })
 
-if ($backupFiles.Count -eq 0) {
+if (@($backupFiles).Count -eq 0) {
     Write-Host "No files found in backup directory." -ForegroundColor Yellow
     exit 0
 }
 
-Write-Host "Found $($backupFiles.Count) file(s) in backup." -ForegroundColor Cyan
+Write-Host "Found $(@($backupFiles).Count) file(s) in backup." -ForegroundColor Cyan
 Write-Host "Each file will be shown with a REDACTED diff. You must approve (Y) or skip (N) each one." -ForegroundColor Yellow
 Write-Host "(Secret values are never shown in the diff.)" -ForegroundColor Yellow
 Write-Host ""
@@ -161,10 +164,15 @@ foreach ($bf in $backupFiles) {
 
     # -- Prompt for confirmation --------------------------------------
     Write-Host ""
-    do {
-        $answer = Read-Host "  Restore '$relativePath'? (Y/N)"
-        $answer = $answer.Trim().ToUpper()
-    } while ($answer -notin @('Y', 'N'))
+    if ($AssumeNo) {
+        $answer = 'N'
+        Write-Host "  Restore '$relativePath'? (Y/N): N (auto -- AssumeNo)" -ForegroundColor DarkGray
+    } else {
+        do {
+            $answer = Read-Host "  Restore '$relativePath'? (Y/N)"
+            $answer = $answer.Trim().ToUpper()
+        } while ($answer -notin @('Y', 'N'))
+    }
 
     if ($answer -eq 'Y') {
         $destDir = Split-Path $currentPath -Parent
@@ -186,7 +194,7 @@ Write-Host ""
 Write-Host "=== Restore complete ===" -ForegroundColor Cyan
 Write-Host "Files restored : $restored"
 Write-Host "Files skipped  : $skipped"
-Write-Host "Total in backup: $($backupFiles.Count)"
+Write-Host "Total in backup: $(@($backupFiles).Count)"
 
 if ($restored -gt 0) {
     Write-Host ""

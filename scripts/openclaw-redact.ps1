@@ -57,10 +57,10 @@ foreach ($ext in $configExtensions) {
 }
 
 # Exclude output dir and backup dirs from scan
-$configFiles = $configFiles | Where-Object {
+$configFiles = @($configFiles | Where-Object {
     $_.FullName -notlike "*openclaw-redacted*" -and
     $_.FullName -notlike "*openclaw-backups*"
-}
+})
 
 if ($configFiles.Count -eq 0) {
     Write-Host "No configuration files found in '$OpenClawRoot'." -ForegroundColor Yellow
@@ -120,8 +120,8 @@ foreach ($f in $configFiles) {
 $manifest = @{
     Timestamp    = (Get-Date).ToUniversalTime().ToString('o')
     OpenClawRoot = $OpenClawRoot
-    TotalFiles   = $manifestEntries.Count
-    TotalRedactions = ($manifestEntries | Measure-Object -Property Redactions -Sum).Sum
+    TotalFiles   = @($manifestEntries).Count
+    TotalRedactions = (@($manifestEntries) | Measure-Object -Property Redactions -Sum).Sum
     Files        = $manifestEntries | ForEach-Object {
         @{ File = $_.File; Redactions = $_.Redactions }
     }
@@ -133,8 +133,8 @@ $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding 
 # -- Summary ----------------------------------------------------------
 Write-Host ""
 Write-Host "=== Redaction complete ===" -ForegroundColor Cyan
-Write-Host "Files processed : $($manifestEntries.Count)"
-Write-Host "Total redactions: $(($manifestEntries | Measure-Object -Property Redactions -Sum).Sum)"
+Write-Host "Files processed : $(@($manifestEntries).Count)"
+Write-Host "Total redactions: $((@($manifestEntries) | Measure-Object -Property Redactions -Sum).Sum)"
 Write-Host "Output directory: $OutputDir"
 Write-Host "Manifest        : $manifestPath"
 Write-Host ""

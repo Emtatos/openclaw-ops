@@ -59,13 +59,11 @@ Set-Content -Path (Join-Path $backupDir  'openclaw-fake.json') -Value $backupJso
 Write-Host "Running restore script to capture diff output..." -ForegroundColor Cyan
 
 # -- Capture diff output ----------------------------------------------
-# We pipe "N" to every prompt so no files are actually restored.
-# We capture all Write-Host output by redirecting the information stream.
+# Use -AssumeNo so no files are restored and no interactive prompt is needed.
+# Capture all output streams as a single string.
 $output = & {
-    # Feed "N" for the Y/N prompt
-    $input = 'N'
-    echo $input | & $restoreScript -BackupDir $backupDir -OpenClawRoot $currentDir
-} 6>&1 2>&1 | Out-String
+    & $restoreScript -BackupDir $backupDir -OpenClawRoot $currentDir -AssumeNo
+} *>&1 | Out-String
 
 Write-Host "Captured output ($($output.Length) chars)" -ForegroundColor DarkGray
 
