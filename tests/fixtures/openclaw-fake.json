@@ -1,0 +1,30 @@
+{
+  "name": "my-openclaw-instance",
+  "version": "2.4.1",
+  "gateway": {
+    "port": 18789,
+    "host": "0.0.0.0"
+  },
+  "botToken": "FAKE_TOKEN_abc123def456ghi789jkl012mno345",
+  "apiKey": "FAKE_API_KEY_xyz789abc123def456ghi789jkl",
+  "key": "sk-FAKE_SECRET_KEY_0123456789abcdef",
+  "secret": "superSecretValue_FAKE_do_not_leak",
+  "password": "FAKE_PASSWORD_hunter2_not_real",
+  "logging": {
+    "level": "info",
+    "file": "openclaw.log"
+  },
+  "nodes": {
+    "maxConcurrent": 5,
+    "timeout": 30000
+  },
+  "agents": {
+    "main": {
+      "model": "gpt-4o",
+      "temperature": 0.7
+    }
+  },
+  "safeField": "this-value-should-not-be-redacted",
+  "anotherSafe": 42,
+  "description": "Test instance for CI verification"
+}

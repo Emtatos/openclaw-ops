@@ -1,0 +1,12 @@
+2025-05-01 10:00:01 [INFO]  Gateway started on port 18789
+2025-05-01 10:00:02 [INFO]  Loading config from openclaw.json
+2025-05-01 10:00:03 [INFO]  Authenticating with "botToken": "FAKE_TOKEN_LOG_abc123def456ghi789"
+2025-05-01 10:00:04 [INFO]  API connection established "apiKey": "FAKE_API_KEY_LOG_xyz789abc123def"
+2025-05-01 10:00:05 [DEBUG] Using signing "key": "sk-FAKE_LOG_KEY_0123456789abcdef"
+2025-05-01 10:00:06 [INFO]  OpenAI proxy initialized with sk-FAKE_LOG_FREE_TEXT_secrettoken42
+2025-05-01 10:00:07 [INFO]  Node paired successfully
+2025-05-01 10:00:08 [INFO]  Agent main/agent loaded (model=gpt-4o)
+2025-05-01 10:00:09 [WARN]  Rate limit approaching for "secret": "superSecretLogValue_FAKE_no_leak"
+2025-05-01 10:00:10 [INFO]  password=FAKE_PASSWORD_LOG_hunter2_not_real in legacy config
+2025-05-01 10:00:11 [INFO]  Health check OK
+2025-05-01 10:00:12 [INFO]  Accepting connections
