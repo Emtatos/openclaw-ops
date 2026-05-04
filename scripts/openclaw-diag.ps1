@@ -54,23 +54,91 @@ Write-Section "Directory structure"
 if (-not (Test-Path $OpenClawRoot)) {
     Write-Warning "OpenClawRoot '$OpenClawRoot' does not exist."
 } else {
+    # Directories to skip in listing (noisy / irrelevant)
+    $skipListDirs = @('node_modules', 'logs', 'sessions', 'transcripts',
+                      'openclaw-backups', 'openclaw-redacted', '.git')
     Get-ChildItem -Path $OpenClawRoot -Recurse -Depth 2 -ErrorAction SilentlyContinue |
         ForEach-Object {
             $rel = $_.FullName.Substring($OpenClawRoot.Length).TrimStart('\', '/')
-            $icon = if ($_.PSIsContainer) { "[DIR] " } else { "      " }
-            Write-Host "$icon$rel"
+            $skipThis = $false
+            foreach ($sd in $skipListDirs) {
+                if ($rel -like "$sd*" -or $rel -like "*/$sd*" -or $rel -like "*\$sd*") {
+                    $skipThis = $true
+                    break
+                }
+            }
+            if (-not $skipThis) {
+                $icon = if ($_.PSIsContainer) { "[DIR] " } else { "      " }
+                Write-Host "$icon$rel"
+            }
         }
 }
 
 # -- 3. Configuration files -----------------------------------------
 Write-Section "Configuration files"
 
-$configExtensions = @('*.json', '*.yaml', '*.yml', '*.toml', '*.env', '*.config', '*.ini', '*.cfg', '*.xml')
+# Directories to exclude from config scan (noisy / irrelevant)
+$excludeDirs = @('node_modules', 'logs', 'sessions', 'transcripts',
+                 'openclaw-backups', 'openclaw-redacted', '.git')
+$excludeExts = @('.bak', '.clobbered')
+
+# Known core config files (checked first)
+$knownConfigs = @(
+    'openclaw.json',
+    'exec-approvals.json',
+    'node.json',
+    'nodes\paired.json',
+    'nodes\pending.json',
+    'agents\main\agent\auth-profiles.json'
+)
+
 $configFiles = @()
+
+# Add known core files if they exist
+foreach ($rel in $knownConfigs) {
+    $full = Join-Path $OpenClawRoot $rel
+    if (Test-Path $full) {
+        $configFiles += @(Get-Item $full)
+    }
+}
+
+# Discover additional config files outside excluded dirs
+$configExtensions = @('*.json', '*.yaml', '*.yml', '*.toml', '*.env', '*.config', '*.ini', '*.cfg', '*.xml')
 
 foreach ($ext in $configExtensions) {
     $found = @(Get-ChildItem -Path $OpenClawRoot -Filter $ext -Recurse -ErrorAction SilentlyContinue)
-    $configFiles += $found
+    foreach ($f in $found) {
+        # Skip files in excluded directories
+        $skip = $false
+        foreach ($exDir in $excludeDirs) {
+            if ($f.FullName -like "*\$exDir\*" -or $f.FullName -like "*/$exDir/*") {
+                $skip = $true
+                break
+            }
+        }
+        # Skip excluded extensions
+        if (-not $skip) {
+            foreach ($exExt in $excludeExts) {
+                if ($f.Name.EndsWith($exExt)) {
+                    $skip = $true
+                    break
+                }
+            }
+        }
+        # Skip duplicates (already added as known config)
+        if (-not $skip) {
+            $isDuplicate = $false
+            foreach ($existing in $configFiles) {
+                if ($existing.FullName -eq $f.FullName) {
+                    $isDuplicate = $true
+                    break
+                }
+            }
+            if (-not $isDuplicate) {
+                $configFiles += $f
+            }
+        }
+    }
 }
 
 if (@($configFiles).Count -eq 0) {
@@ -158,8 +226,15 @@ if ($openclawCmd) {
     foreach ($sub in @('gateway status', 'nodes status', 'exec-policy show')) {
         try {
             $out = & openclaw $sub.Split(' ') 2>&1
+            $exitCode = $LASTEXITCODE
             $first = ($out | Select-Object -First 3) -join '; '
-            Write-Host "  [OK]   openclaw $sub -- $first" -ForegroundColor Green
+            # Check for error indicators
+            $hasError = ($exitCode -ne 0) -or ($first -match '(?i)error:')
+            if ($hasError) {
+                Write-Host "  [FAIL] openclaw $sub -- $first" -ForegroundColor Red
+            } else {
+                Write-Host "  [OK]   openclaw $sub -- $first" -ForegroundColor Green
+            }
         } catch {
             Write-Host "  [FAIL] openclaw $sub -- $($_.Exception.Message)" -ForegroundColor Red
         }
@@ -199,18 +274,40 @@ foreach ($ep in $endpoints) {
 # -- 8. Process / service check --------------------------------------
 Write-Section "Process / service check"
 
-$processNames = @('OpenClaw', 'openclaw', 'dotnet')
-
-foreach ($name in $processNames) {
-    $procs = Get-Process -Name $name -ErrorAction SilentlyContinue
-    if ($procs) {
-        foreach ($p in $procs) {
-            Write-Host "  [RUNNING] $($p.ProcessName) (PID $($p.Id), CPU $([math]::Round($p.CPU, 2))s)" -ForegroundColor Green
+# Scheduled tasks (Windows only -- silently skipped on non-Windows)
+$taskNames = @('OpenClaw Gateway', 'OpenClaw Node')
+foreach ($taskName in $taskNames) {
+    try {
+        $taskInfo = & schtasks /Query /TN $taskName /FO LIST 2>&1
+        $taskExit = $LASTEXITCODE
+        if ($taskExit -eq 0) {
+            $statusLine = ($taskInfo | Select-String 'Status:' | Select-Object -First 1)
+            $statusText = if ($statusLine) { $statusLine.ToString().Trim() } else { 'Status: unknown' }
+            Write-Host "  [INFO] Scheduled Task '$taskName' -- $statusText" -ForegroundColor Green
+        } else {
+            Write-Host "  [INFO] Scheduled Task '$taskName' -- not found" -ForegroundColor DarkGray
         }
-    } else {
-        Write-Host "  [NOT RUNNING] $name" -ForegroundColor DarkGray
+    } catch {
+        Write-Host "  [INFO] Scheduled Task '$taskName' -- check not available" -ForegroundColor DarkGray
     }
 }
+
+# Process scan -- informational only (gateway often runs via node.exe)
+$processNames = @('OpenClaw', 'openclaw', 'node', 'dotnet')
+
+foreach ($name in $processNames) {
+    $procs = @(Get-Process -Name $name -ErrorAction SilentlyContinue)
+    if (@($procs).Count -gt 0) {
+        foreach ($p in $procs) {
+            $cpuInfo = try { [math]::Round($p.CPU, 2) } catch { 'N/A' }
+            Write-Host "  [INFO] $($p.ProcessName) running (PID $($p.Id), CPU ${cpuInfo}s)" -ForegroundColor Green
+        }
+    } else {
+        Write-Host "  [INFO] $name -- not detected (may run as service/task)" -ForegroundColor DarkGray
+    }
+}
+
+Write-Host "  (Port 18789 check above is the primary gateway indicator)" -ForegroundColor DarkGray
 
 # -- 9. Log tail (full-strength redaction via shared lib) -------------
 Write-Section "Recent log entries (last 20 lines, redacted)"

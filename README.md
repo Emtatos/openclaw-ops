@@ -13,13 +13,15 @@ These PowerShell scripts help you maintain, troubleshoot, and safely share your 
 Collects environment and configuration health information — **without ever displaying secret values**.
 
 - Shows OS, runtime, and directory structure
-- Lists all configuration files with size and last-modified dates
+- Lists configuration files with size and last-modified dates (excludes `node_modules`, `logs`, `sessions`, `transcripts`, backup/redacted dirs, `.git`, `*.bak`, `*.clobbered`)
+- Prioritizes known OpenClaw config files (`openclaw.json`, `exec-approvals.json`, `node.json`, etc.)
 - Audits config files for secret-looking keys (names only, never values)
-- Checks OpenClaw CLI status (`gateway status`, `nodes status`, `exec-policy show`)
-- Tests gateway port 18789 connectivity
+- Checks OpenClaw CLI status (`gateway status`, `nodes status`, `exec-policy show`) -- honestly reports `[FAIL]` when commands return errors
+- Tests gateway port 18789 connectivity (primary gateway indicator)
+- Checks Windows Scheduled Tasks (`OpenClaw Gateway`, `OpenClaw Node`) if available
+- Process scan is informational (`[INFO]`) -- gateway often runs via `node.exe` as a scheduled task
 - Optional network checks (GitHub, npm, OpenAI)
-- Checks if OpenClaw processes are running
-- Tails the most recent log file with **full-strength redaction** (same rules as redact/restore — JSON-shaped secrets, `sk-*` tokens, YAML/INI/XML values are all caught)
+- Tails the most recent log file with **full-strength redaction** (same rules as redact/restore -- JSON-shaped secrets, `sk-*` tokens, YAML/INI/XML values are all caught)
 
 ```powershell
 .\scripts\openclaw-diag.ps1
@@ -145,6 +147,9 @@ Test fixtures and scripts live in `tests/`:
 
 # Test that diag log tail output never shows secret values
 .\tests\test-diag-log.ps1
+
+# Test diag status checks, config scope, and node_modules exclusion
+.\tests\test-diag-status.ps1
 ```
 
 ---
